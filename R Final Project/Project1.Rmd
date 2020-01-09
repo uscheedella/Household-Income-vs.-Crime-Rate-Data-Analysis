@@ -1,0 +1,449 @@
+---
+title: "Project 1"
+author: "John Luksas"
+date: "April 9, 2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r declarations}
+#the declaration of the libraries
+library(tidyverse)
+library(ggmap)
+library(RColorBrewer)
+library(gridExtra)
+library(here)
+options(digits = 3)
+set.seed(1234)
+theme_set(theme_minimal())
+library(ISLR)
+library(MASS)
+library(ggplot2)
+library(gridExtra)
+library(readxl)
+library(UsingR)
+```
+
+
+```{r datamanipulation}
+#Data manipulation
+Crimes_2001_to_present = read_excel("C:/Users/johnl/Desktop/Crimes_-_2001_to_present.xlsx")
+CommunityDataTemp = read_excel("C:/Users/johnl/Desktop/Per_Capita_Income.xlsx")
+CommunityDataTemp = data.frame(CommunityDataTemp)
+CommunityData = subset(CommunityDataTemp, select = -c(PERCENT.OF.HOUSING.CROWDED,PERCENT.HOUSEHOLDS.BELOW.POVERTY,PERCENT.AGED.16..UNEMPLOYED,PERCENT.AGED.25..WITHOUT.HIGH.SCHOOL.DIPLOMA,PERCENT.AGED.UNDER.18.OR.OVER.64) )
+colnames(CommunityData) <- c("Community.Area","Community.Area.Name","Per.Capita.Income","Harship.Index")
+citydata = data.frame(Crimes_2001_to_present)
+citydata = subset(citydata, select = -c(Case.Number,ID,Block,IUCR,Description,Location.Description,Beat,Ward,FBI.Code,X.Coordinate,Y.Coordinate,Updated.On,Location) )
+MasterData = merge(citydata,CommunityData,by  = "Community.Area")
+colnames(MasterData)[2] <- "Time"
+MasterData$Time = format(as.POSIXct(strptime(MasterData$Time,"%Y-%m-%d %H:%M",tz="")) ,format = "%H")
+MasterData$Time = as.numeric(MasterData$Time)
+gsub("(?<![0-9])0+", "", MasterData$Time, perl = TRUE)
+
+##############################################################################################################################
+
+#This is where we split the data set into two distinct sections using the years
+
+MasterDataSection1 = subset(MasterData, MasterData$Year>2000 & MasterData$Year <2004)
+MasterDataSection2 = subset(MasterData, MasterData$Year>2012 & MasterData$Year <2016)
+```
+
+
+
+```{r TotalCrime}
+##############################################################################################################################
+
+#Finds the top crimes ove the entire period for ENTIRE MASTER DATA SET
+MasterDataTable = table(MasterData$Primary.Type)
+MasterDataTable = sort(MasterDataTable, decreasing = TRUE)
+MasterDataTableTop = MasterDataTable[1:4]
+MasterDataTable = data.frame(MasterDataTable)
+MasterDataTable = subset(MasterDataTable,Freq > 1000) # Make it so we only consider crimes that have more than 1000 occurances
+
+
+p<-ggplot(data=MasterDataTable, aes(x=Var1, y=Freq)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  theme_minimal()
+p + theme(text = element_text(size=8),axis.text.x = element_text(angle = 90, hjust = 1))+ xlab("Type of Crime") + ylab("Number of occurances") + ggtitle("Number of Occurances of Different Types of Crimes in Chicago (> 1000 occurances)")
+
+##############################################################################################################################
+
+#Finds the top crimes for the MAsterDataSection1
+MasterDataTable1 = table(MasterDataSection1$Primary.Type)
+MasterDataTable1 = sort(MasterDataTable1, decreasing = TRUE)
+MasterDataTableTop1 = MasterDataTable1[1:4]
+MasterDataTable1 = data.frame(MasterDataTable1)
+MasterDataTable1 = subset(MasterDataTable1,Freq > 1000)
+
+
+p<-ggplot(data=MasterDataTable1, aes(x=Var1, y=Freq)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  theme_minimal()
+p + theme(text = element_text(size=8),axis.text.x = element_text(angle = 90, hjust = 1))+ xlab("Type of Crime") + ylab("Number of occurances") + ggtitle("Number of Occurances of Different Types of Crimes in Chicago (> 1000 occurances) in Years 2001 to 2003")
+
+##############################################################################################################################
+
+#Finds the top crimes for MasterDataSection2
+MasterDataTable2 = table(MasterDataSection2$Primary.Type)
+MasterDataTable2 = sort(MasterDataTable2, decreasing = TRUE)
+MasterDataTableTop2 = MasterDataTable2[1:4]
+MasterDataTable2 = data.frame(MasterDataTable2)
+MasterDataTable2 = subset(MasterDataTable2,Freq > 1000) # Make it so we only consider crimes that have more than 1000 occurances
+
+
+p<-ggplot(data=MasterDataTable2, aes(x=Var1, y=Freq)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  theme_minimal()
+p + theme(text = element_text(size=8),axis.text.x = element_text(angle = 90, hjust = 1))+ xlab("Type of Crime") + ylab("Number of occurances") + ggtitle("Number of Occurances of Different Types of Crimes in Chicago (> 1000 occurances) for Years 2013 to 2015")
+
+##############################################################################################################################
+
+MasterDatattest1 = MasterDataTable1[c(3,4),]
+MasterDatattest1 = MasterDataTable1$Freq[1] - MasterDataTable1$Freq[2]
+MasterDatattest2 = MasterDataTable2[c(3,4),]
+MasterDatattest2 = MasterDataTable2$Freq[1] - MasterDataTable2$Freq[2]
+
+wilcox.test(MasterDatattest1,MasterDatattest2)
+```
+
+
+#Theft, Battery, Criminal Damage, and Narcotics are the top 4 types of crimes that occur.
+
+
+```{r histogramtime}
+##############################################################################################################################
+#Plot of total crime data over time for the MasterData data set
+
+TimeTable = table(MasterData$Time)
+hist(MasterData$Time, xlab= 'Time of Day' )
+p<-ggplot(MasterData, aes(x=Time)) + geom_histogram(color="black", fill="white")
+p+ geom_vline(aes(xintercept=mean(Time)),color="blue", linetype="dashed", size=1)+ ggtitle("Total Crime Per Hour for Years 2001 - 2017")
+ggplot(MasterData, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Total Crime Per Hour for Years 2001 - 2017")
+
+#Plot of Theft crime over time
+HistTheft = subset(MasterData,MasterData$Primary.Type == 'THEFT')
+ggplot(HistTheft, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Theft Crime Total Per Hour for Years 2001 - 2017")
+
+#Plot of Battery crime over time
+HistBattery = subset(MasterData,MasterData$Primary.Type == 'BATTERY')
+ggplot(HistBattery, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Battery Crime Total Per Hour for Years 2001 - 2017")
+
+#Plot of Criminal Damage crimes over time
+HistCriminal = subset(MasterData,MasterData$Primary.Type == 'CRIMINAL DAMAGE')
+ggplot(HistCriminal, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Criminal Damage Crime Total Per Hour for Years 2001 - 2017")
+
+#Plot of Narcotics crimes over time
+HistNarcotics = subset(MasterData,MasterData$Primary.Type == 'NARCOTICS')
+ggplot(HistNarcotics, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Narcotics Crime Total Per Hour for Years 2001 - 2017")
+
+##############################################################################################################################
+
+#Plot of total crime data over time for the MasterDataSection1 data set
+TimeTable1 = table(MasterDataSection1$Time)
+hist(MasterDataSection1$Time, xlab= 'Time of Day' )
+p<-ggplot(MasterDataSection1, aes(x=Time)) + geom_histogram(color="black", fill="white")
+p+ geom_vline(aes(xintercept=mean(Time)),color="blue", linetype="dashed", size=1)+ ggtitle("Total Crime Per Hour for Years 2001 - 2003")
+ggplot(MasterDataSection1, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Total Crime Per Hour for Years 2001 - 2003")
+
+#Plot of Theft crime over time
+HistTheft1 = subset(MasterDataSection1,MasterDataSection1$Primary.Type == 'THEFT')
+ggplot(HistTheft1, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Theft Crime Total Per Hour for Years 2001 - 2003")
+
+#Plot of Battery crime over time
+HistBattery1 = subset(MasterDataSection1,MasterDataSection1$Primary.Type == 'BATTERY')
+ggplot(HistBattery1, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Battery Crime Total Per Hour for Years 2001 - 2003")
+
+#Plot of Criminal Damage crimes over time
+HistCriminal1 = subset(MasterDataSection1,MasterDataSection1$Primary.Type == 'CRIMINAL DAMAGE')
+ggplot(HistCriminal1, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Criminal Damage Crime Total Per Hour for Years 2001 - 2003")
+
+#Plot of Narcotics crimes over time
+HistNarcotics1 = subset(MasterDataSection1,MasterDataSection1$Primary.Type == 'NARCOTICS')
+ggplot(HistNarcotics, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Narcotics Crime Total Per Hour for Years 2001 - 2003")
+
+##############################################################################################################################
+TimeTable2 = table(MasterDataSection2$Time)
+hist(MasterDataSection2$Time, xlab= 'Time of Day' )
+p<-ggplot(MasterDataSection2, aes(x=Time)) + geom_histogram(color="black", fill="white")
+p+ geom_vline(aes(xintercept=mean(Time)),color="blue", linetype="dashed", size=1)+ ggtitle("Total Crime Per Hour for Years 2013 - 2016")
+ggplot(MasterDataSection2, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Total Crime Per Hour for Years 2013 - 2016")
+
+#Plot of Theft crime over time
+HistTheft2 = subset(MasterDataSection2,MasterDataSection2$Primary.Type == 'THEFT')
+ggplot(HistTheft2, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Theft Crime Total Per Hour for Years 2013 - 2016")
+
+#Plot of Battery crime over time
+HistBattery2 = subset(MasterDataSection2,MasterDataSection2$Primary.Type == 'BATTERY')
+ggplot(HistBattery2, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Battery Crime Total Per Hour for Years 2013 - 2016")
+
+#Plot of Criminal Damage crimes over time
+HistCriminal2 = subset(MasterDataSection2,MasterDataSection2$Primary.Type == 'CRIMINAL DAMAGE')
+ggplot(HistCriminal2, aes(x=Time))+geom_histogram(color="darkblue", fill="lightblue") + ggtitle("Criminal Damage Crime Total Per Hour for Years 2013 - 2016")
+
+#Plot of Narcotics crimes over time
+HistNarcotics2 = subset(MasterDataSection2,MasterDataSection2$Primary.Type == 'NARCOTICS')
+ggplot(HistNarcotics2, aes(x=Time))+geom_histogram(aes(y =..density..), 
+                 breaks=seq(0, 23, by = 1),color="darkblue", fill="lightblue",alpha=.2) + geom_density(col=2) + ggtitle("Narcotics Crime Total Per Hour for Years 2013 - 2016")
+
+densityplot(~ Time, group = Year, data = MasterData, auto.key = TRUE)
+ggplot(MasterData) + geom_density(aes(x = Time, color = Primary.Type))
+densityplot(~ Time | Primary.Type, data = MasterData)
+```
+
+```{r HardshipandCrime}
+#This caclulates the number of crimes per each of the 77 community areas in Chicago
+numvector = c()
+i <- 0
+while (i < 78) {
+  temp = subset(MasterData, MasterData$Community.Area == i)
+  numvector[i] = nrow(temp)
+  i = i+1
+}
+
+communityvector = c(1:77)
+numvector = cbind(communityvector,numvector)
+numvector = data.frame(numvector)
+colnames(numvector) = c("CommunityArea","Number")
+ggplot(numvector, aes(x=CommunityArea, y=Number)) + geom_bar(stat = "identity") + ggtitle("Number of Crime Ocurrances Per Community Area from 2001 to 2017") + xlab("Commmunity Areas")
+
+#This is for the MasterDataSection1
+
+numvector1 = c()
+i <- 0
+while (i < 78) {
+  temp = subset(MasterDataSection1, MasterDataSection1$Community.Area == i)
+  numvector1[i] = nrow(temp)
+  i = i+1
+}
+
+communityvector = c(1:77)
+numvector1 = cbind(communityvector,numvector1)
+numvector1 = data.frame(numvector1)
+colnames(numvector1) = c("CommunityArea","Number")
+ggplot(numvector1, aes(x=CommunityArea, y=Number)) + geom_bar(stat = "identity") + ggtitle("Number of Crime Ocurrances Per Community Area from 2001 to 2003") + xlab("Commmunity Areas")
+
+#This is for the MasterDataSection2
+
+numvector2 = c()
+i <- 0
+while (i < 78) {
+  temp = subset(MasterDataSection2, MasterDataSection2$Community.Area == i)
+  numvector2[i] = nrow(temp)
+  i = i+1
+}
+
+communityvector = c(1:77)
+numvector2 = cbind(communityvector,numvector2)
+numvector2 = data.frame(numvector2)
+colnames(numvector2) = c("CommunityArea","Number")
+
+ggplot(numvector2, aes(x=CommunityArea, y=Number)) + geom_bar(stat = "identity") + ggtitle("Number of Crime Ocurrances Per Community Area from 2013 to 2015") + xlab("Commmunity Areas") + geom_density()
+Mastervector = cbind(numvector,numvector1,numvector2)
+Mastervector = Mastervector[,-3]
+Mastervector = Mastervector[,-4]
+Communityvector = CommunityData[c(3,4)]
+Communityvector = Communityvector[-78,]
+Mastervector = cbind(Mastervector,Communityvector)
+colnames(Mastervector)[5]= "Income"
+colnames(Mastervector)[6] = "Hardship Index"
+
+#This is where we perform the t-test for each of the sections of data and fit linear regresion models to them
+t.test(Mastervector$Number.1,Mastervector$Income, alternative = "two.sided")
+t.test(Mastervector$Number.2,Mastervector$Income, alternative = "two.sided")
+
+wilcox.test(Mastervector$Number.1,Mastervector$Income, alternative = c("two.sided","less","greater"))
+wilcox.test(Mastervector$Number.2,Mastervector$Income, alternative = c("two.sided","less","greater"))
+
+t.test(Mastervector$Number.1,Mastervector$`Hardship Index`, alternative = "two.sided")
+t.test(Mastervector$Number.2,Mastervector$`Hardship Index`, alternative = "two.sided")
+
+Mastervectorsubset = subset(MasterData,MasterData$Primary.Type == 'THEFT', select = c(Primary.Type))
+Mastervector = cbind(Mastervectorsubset)
+
+linearmodel = lm(Mastervector$Income~Mastervector$Number.1)
+                                     
+plot(linearmodel)
+
+ggplot(Mastervector, aes(x = Income, y = Number.1)) + geom_point()+stat_smooth(method = "lm", col = "red")
+
+fit <- aov(y ~ A, data=mydataframe)
+
+```
+
+
+```{r ChangeYear}
+#The top 4 crimes are Theft, Battery,Criminal Damage, Narcotics
+Year = c("2001","2006","2011","2016")
+
+Theft2001 = subset(MasterData, MasterData$Year =='2001' & MasterData$Primary.Type == 'THEFT', select = c(Primary.Type))
+Theft2001 = nrow(Theft2001)
+Theft2006 = subset(MasterData, MasterData$Year =='2006' & MasterData$Primary.Type == 'THEFT', select = c(Primary.Type))
+Theft2006 = nrow(Theft2006)
+Theft2011 = subset(MasterData, MasterData$Year =='2011' & MasterData$Primary.Type == 'THEFT', select = c(Primary.Type))
+Theft2011 = nrow(Theft2011)
+Theft2016 = subset(MasterData, MasterData$Year =='2016' & MasterData$Primary.Type == 'THEFT', select = c(Primary.Type))
+Theft2016 = nrow(Theft2016)
+Theftvector = c(Theft2001,Theft2006,Theft2011,Theft2016)
+
+Battery2001 = subset(MasterData, MasterData$Year =='2001' & MasterData$Primary.Type == 'BATTERY', select = c(Primary.Type))
+Battery2001 = nrow(Battery2001)
+Battery2006 = subset(MasterData, MasterData$Year =='2006' & MasterData$Primary.Type == 'BATTERY', select = c(Primary.Type))
+Battery2006 = nrow(Battery2006)
+Battery2011 = subset(MasterData, MasterData$Year =='2011' & MasterData$Primary.Type == 'BATTERY', select = c(Primary.Type))
+Battery2011 = nrow(Battery2011)
+Battery2016 = subset(MasterData, MasterData$Year =='2016' & MasterData$Primary.Type == 'BATTERY', select = c(Primary.Type))
+Battery2016 = nrow(Battery2016)
+Batteryvector = c(Battery2001,Battery2006,Battery2011,Battery2016)
+
+Criminal2001 = subset(MasterData, MasterData$Year =='2001' & MasterData$Primary.Type == 'CRIMINAL DAMAGE', select = c(Primary.Type))
+Criminal2001 = nrow(Criminal2001)
+Criminal2006 = subset(MasterData, MasterData$Year =='2006' & MasterData$Primary.Type == 'CRIMINAL DAMAGE', select = c(Primary.Type))
+Criminal2006 = nrow(Criminal2006)
+Criminal2011 = subset(MasterData, MasterData$Year =='2011' & MasterData$Primary.Type == 'CRIMINAL DAMAGE', select = c(Primary.Type))
+Criminal2011 = nrow(Criminal2011)
+Criminal2016 = subset(MasterData, MasterData$Year =='2016' & MasterData$Primary.Type == 'CRIMINAL DAMAGE', select = c(Primary.Type))
+Criminal2016 = nrow(Criminal2016)
+Criminalvector = c(Criminal2001,Criminal2006,Criminal2011,Criminal2016)
+
+Narcotics2001 = subset(MasterData, MasterData$Year =='2001' & MasterData$Primary.Type == 'NARCOTICS', select = c(Primary.Type))
+Narcotics2001 = nrow(Narcotics2001)
+Narcotics2006 = subset(MasterData, MasterData$Year =='2006' & MasterData$Primary.Type == 'NARCOTICS', select = c(Primary.Type))
+Narcotics2006 = nrow(Narcotics2006)
+Narcotics2011 = subset(MasterData, MasterData$Year =='2011' & MasterData$Primary.Type == 'NARCOTICS', select = c(Primary.Type))
+Narcotics2011 = nrow(Narcotics2011)
+Narcotics2016 = subset(MasterData, MasterData$Year =='2016' & MasterData$Primary.Type == 'NARCOTICS', select = c(Primary.Type))
+Narcotics2016 = nrow(Narcotics2016)
+Narcoticsvector = c(Narcotics2001,Narcotics2006,Narcotics2011,Narcotics2016)
+
+Theftvector = cbind(Year,Theftvector)
+Theftvector = data.frame(Theftvector)
+colnames(Theftvector)[2] = "Number"
+Batteryvector = cbind(Year,Batteryvector)
+Batteryvector = data.frame(Batteryvector)
+colnames(Batteryvector)[2] = "Number"
+Criminalvector = cbind(Year,Criminalvector)
+Criminalvector = data.frame(Criminalvector)
+colnames(Criminalvector)[2] = "Number"
+Narcoticsvector = cbind(Year,Narcoticsvector)
+Narcoticsvector = data.frame(Narcoticsvector)
+colnames(Narcoticsvector)[2] = "Number"
+
+ggplot(data=Theftvector, aes(x=Year, y=Number, group=1)) + geom_line() + geom_point()  +ggtitle("Theft Crimes from 2001 to 2016")
+ggplot(data=Batteryvector, aes(x=Year, y=Number, group=1)) + geom_line() + geom_point()  +ggtitle("Battery Crimes from 2001 to 2016")
+ggplot(data=Criminalvector, aes(x=Year, y=Number, group=1)) + geom_line() + geom_point()  +ggtitle("Criminal Damage Crimes from 2001 to 2016")
+ggplot(data=Narcoticsvector, aes(x=Year, y=Number, group=1)) + geom_line() + geom_point()  +ggtitle("Narcotics Crimes from 2001 to 2016")
+
+```
+
+
+```{r yearmorepoints}
+
+#This code is just a more grainular version of the other yearly code for each of the 4 top crimes
+
+
+YearsAll = c(2001:2018)
+Theftvectorall = c()
+index3 = 1
+while (index3 < 20) {
+  i = index3 + 2000
+  TheftTemp = subset(MasterData, MasterData$Year == i & MasterData$Primary.Type == 'THEFT', select = c(Primary.Type))
+  Theftvectorall[index3-1] = nrow(TheftTemp)
+  index3 = index3 + 1
+  print(index3)
+}
+Theftvectorall = cbind(YearsAll,Theftvectorall)
+Theftvectorall = data.frame(Theftvectorall)
+colnames(Theftvectorall)[2] = "Number"
+ggplot(data=Theftvectorall, aes(x=YearsAll, y=Number, group=1)) + geom_line() + geom_point()  +ggtitle("Theft Crimes from 2001 to 2016")
+
+####
+Batteryvectorall = c()
+index2 = 1
+while (index3 < 20) {
+  i = index2 + 2000
+  BatteryTemp = subset(MasterData, MasterData$Year == i & MasterData$Primary.Type == 'BATTERY', select = c(Primary.Type))
+  Batteryvectorall[index3-1] = nrow(BatteryTemp)
+  index2 = index2 + 1
+  print(index3)
+}
+Batteryvectorall = cbind(YearsAll,Batteryvectorall)
+Batteryvectorall = data.frame(Batteryvectorall)
+colnames(Theftvectorall)[2] = "Number"
+ggplot(data=Batteryvectorall, aes(x=YearsAll, y=Number, group=1)) + geom_line() + geom_point()  +ggtitle("Theft Crimes from 2001 to 2016")
+
+####
+Narcoticsvectorall = c()
+index1 = 1
+while (index1 < 20) {
+  i = index1 + 2000
+  NarcoticsTemp = subset(MasterData, MasterData$Year == i & MasterData$Primary.Type == 'NARCOTICS', select = c(Primary.Type))
+  Narcoticsvectorall[index1-1] = nrow(NarcoticsTemp)
+  index1 = index1 + 1
+  print(index1)
+}
+Narcoticsvectorall = cbind(YearsAll,Narcoticsvectorall)
+Narcoticsvectorall = data.frame(Narcoticsvectorall)
+colnames(Narcoticsvectorall)[2] = "Number"
+ggplot(data=Narcoticsvectorall, aes(x=YearsAll, y=Number, group=1)) + geom_line() + geom_point()  +ggtitle("Narcotics Crimes from 2001 to 2016")
+
+```
+
+```{r stamen}
+# store bounding box coordinates
+chi_bb <- c(left = -87.936287,bottom = 41.679835,right = -87.447052,top = 42.000835)
+
+chicago_stamen <- get_stamenmap(bbox = chi_bb,zoom = 11)
+ggmap(chicago_stamen)
+
+get_stamenmap(bbox = chi_bb,zoom = 12) %>%
+ggmap()
+
+```
+
+```{r googlemaps}
+#This code uses the Google Maps API and graphs out crime occurance coordinates on top of the map
+
+chicago <- get_googlemap(center = c(lon = -87.65, lat = 41.855),zoom = 11)
+ggmap(chicago)
+
+ggmap(chicago) + geom_point(data = MasterData,mapping = aes(x = Longitude,y = Latitude))
+
+ggmap(chicago) + geom_point(data = MasterData,mapping = aes(x = Longitude,y = Latitude))
+
+ggmap(chicago) +geom_density_2d(data = MasterData,aes(x = Longitude,y = Latitude))+geom_density_2d(data = D18,aes(x = Longitude,y = Latitude))
+
+ggmap(chicago) +stat_density_2d(data = MasterData,aes(x = Longitude,y = Latitude,fill = stat(level)),alpha = .2,bins = 25,geom = "polygon") + scale_fill_gradientn(colors = brewer.pal(7, "YlOrRd"))
+
+#4 panel graph
+
+ggmap(chicago) +
+  stat_density_2d(data = MasterData %>%filter(`Primary.Type` %in% c("BURGLARY", "MOTOR VEHICLE THEFT","NARCOTICS", "ROBBERY")),
+                  aes(x = Longitude,
+                      y = Latitude,
+                      fill = stat(level)),
+                  alpha = .4,
+                  bins = 10,
+                  geom = "polygon") +
+  scale_fill_gradientn(colors = brewer.pal(7, "YlOrRd")) +
+  facet_wrap(~ `Primary.Type`) + ggtitle("Heat Map of Total Crime For Top 4 Crime Types")
+
+# panel graph years
+ggmap(chicago) +
+  stat_density_2d(data = citydata %>%
+                    filter(`Year` %in% c("2016", "2011",
+                                                 "2006", "2001")),
+                  aes(x = Longitude,
+                      y = Latitude,
+                      fill = stat(level)),
+                  alpha = .4,
+                  bins = 10,
+                  geom = "polygon") +
+  scale_fill_gradientn(colors = brewer.pal(7, "YlOrRd")) +
+  facet_wrap(~ `Year`) + ggtitle("Heat Map of Total Crime Over Time")
+
+
+```
+
+
+
+
